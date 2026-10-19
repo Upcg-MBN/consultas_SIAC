@@ -1,0 +1,16 @@
+# Lo que NUNCA debe subirse: el Excel de origen trae datos personales de los ciudadanos
+# (nombre, RUT, teléfono, correo). El panel solo lee los campos autorizados.
+origen/
+*.xlsx
+~$*
+logs/
+*.pdf
+__pycache__/
+*.tmp
+*.part
+.env
+# Material local, no necesario para que funcione
+_respaldo_antes_de_pruebas/
+Panel-Autoridades-ejemplo/
+CLAUDE.md
+# datos.js y estado.js SÍ se publican: los regenera la tarea diaria (actualizar.ps1 -Publicar).

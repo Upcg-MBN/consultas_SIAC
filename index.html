@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Consultas SIAC · Ministerio de Bienes Nacionales</title>
+<link rel="stylesheet" href="ds/styles.css">
+<link rel="stylesheet" href="ds/dataviz-tokens.css">
+<style>
+/* Mismo sistema visual que el Panel de Autoridades (franja azul con filete
+   rojo, menú lateral de 280 px, filtros como chips, tarjetas blancas sobre
+   gris). Todo el color va por var(--token). Estados de plazo: verde = dentro,
+   ámbar = próxima a vencer, rojo = vencida / fuera de plazo; siempre con
+   texto o ícono además del color. */
+*{box-sizing:border-box}
+html,body{height:100%}
+html{font-size:16px}
+@media (min-width:1024px){html{font-size:clamp(14px, min(9.077px + .3846vw, 7.667px + .8333vh), 16px)}}
+body{margin:0; background:var(--gris-5); color:var(--negro-text); font-family:var(--font-sans); font-size:1rem; line-height:1.4}
+:focus-visible{outline:none; box-shadow:var(--focus-ring)}
+::selection{background:var(--primario-base); color:var(--blanco-base)}
+*{scrollbar-width:thin; scrollbar-color:var(--gris-20) transparent}
+::-webkit-scrollbar{width:0.625rem; height:0.625rem}
+::-webkit-scrollbar-thumb{background:var(--gris-20); border-radius:var(--radius-pill)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms !important}}
+button{font:inherit; color:inherit}
+.ico{width:1.25rem; height:1.25rem; flex:none; fill:currentColor}
+.ico--22{width:1.375rem; height:1.375rem}
+.ico--24{width:1.5rem; height:1.5rem}
+.ico--18{width:1.125rem; height:1.125rem}
+.oculto-vis{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+
+.app{display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto 0.25rem 1fr 0.75rem; min-height:100vh}
+
+/* ---------- Franja institucional ---------- */
+.cab{background:var(--primario-base); color:var(--blanco-base); min-height:6.75rem; display:flex; align-items:center; gap:2rem; padding:0 3rem}
+.cab img{height:4.25rem; display:block}
+.cab-txt{display:flex; flex-direction:column; gap:2px; margin-left:1rem; min-width:0}
+.cab h1{margin:0; font-family:var(--font-brand); font-weight:700; font-size:2rem; line-height:1.15; letter-spacing:.01em}
+.cab p{margin:0; font-size:1rem; color:rgba(255,255,255,.9)}
+.cab-der{margin-left:auto; display:flex; align-items:center; gap:1.5rem}
+.sello{display:flex; flex-direction:column; align-items:flex-end; gap:2px; font-size:0.9375rem; color:rgba(255,255,255,.9); white-space:nowrap}
+.sello div{display:flex; align-items:center; gap:0.5rem}
+.btn-borde{display:flex; align-items:center; gap:0.5rem; padding:0.625rem 1rem; border:1px solid rgba(255,255,255,.55);
+  border-radius:var(--radius-s); background:transparent; color:var(--blanco-base); font-size:0.9375rem; cursor:pointer}
+.btn-borde:hover{background:rgba(255,255,255,.12)}
+.filete{background:var(--accent-base)}
+.barra-pie{background:var(--primario-darken-2)}
+
+/* ---------- Menú ---------- */
+.cuerpo{display:flex; min-height:0}
+.menu{width:17.5rem; flex:none; background:var(--blanco-base); border-right:1px solid var(--gris-10); display:flex; flex-direction:column;
+  padding:1.5rem 0; overflow:hidden; transition:width var(--duration-base) var(--ease-standard)}
+.app.cerrado .menu{width:4.75rem}
+.app.cerrado .txt{display:none}
+.menu-cab{display:flex; align-items:center; gap:0.5rem; padding:0 1.25rem 0.75rem; min-height:2.75rem}
+.menu-rot{font-size:max(12px,0.75rem); font-weight:700; letter-spacing:.08em; color:var(--gris-60)}
+.menu-alt{margin-left:auto; width:2rem; height:2rem; border:0; border-radius:var(--radius-s); background:none; color:var(--primario-darken-1);
+  display:grid; place-items:center; cursor:pointer; flex:none}
+.menu-alt:hover{background:var(--secundario-base)}
+.pag{display:flex; align-items:center; gap:0.875rem; width:100%; padding:0.875rem 1.375rem; border:0; border-left:0.25rem solid transparent;
+  background:none; font-size:1.0625rem; text-align:left; white-space:nowrap; cursor:pointer}
+.pag:hover{background:var(--gris-5)}
+.pag[aria-current="page"]{background:var(--secundario-base); color:var(--primario-darken-1); border-left-color:var(--primario-darken-1); font-weight:500}
+.menu-pie{margin-top:auto; padding:1.5rem 1.375rem 0; border-top:1px solid var(--gris-10); display:flex; flex-direction:column; gap:0.5rem}
+.menu-pie button{display:flex; align-items:center; gap:0.875rem; padding:0.25rem 0; border:0; background:none; font-size:0.9375rem; color:var(--gris-60); cursor:pointer; white-space:nowrap}
+.menu-pie button:hover{color:var(--primario-darken-1)}
+
+/* ---------- Contenido y filtros ---------- */
+.contenido{position:relative; flex:1; min-width:0; padding:2rem; display:flex; flex-direction:column; gap:1.25rem; overflow:auto}
+.filtros{display:flex; align-items:center; gap:1rem; flex-wrap:wrap}
+.filtros-hoja{display:contents}
+.chip{position:relative; display:flex; align-items:center; gap:0.625rem; height:3rem; padding:0 1rem; flex:1 0 12.25rem; max-width:16rem;
+  background:var(--blanco-base); border:1px solid var(--gris-20); border-radius:var(--radius-s); font-size:1rem; cursor:pointer}
+.chip:hover{border-color:var(--gris-40)}
+.chip:focus-within{box-shadow:var(--focus-ring)}
+.chip > .ico:first-child{color:var(--primario-darken-1)}
+.chip-rot{white-space:nowrap}
+.chip input[type=date]{border:0; background:transparent; font:inherit; color:inherit; flex:1; min-width:0; height:100%; outline:none; cursor:pointer}
+.chip--fecha{flex-basis:16.5rem; max-width:18rem}
+.chip select{border:0; background:transparent; font:inherit; color:inherit; flex:1; min-width:0; height:100%; outline:none; cursor:pointer}
+.chip--cmp{flex-basis:21rem; max-width:23rem}
+.chip-flecha{position:absolute; right:0.75rem; pointer-events:none; color:var(--gris-50)}
+.multi{cursor:default}
+.multi-btn{flex:1; min-width:0; height:100%; padding:0 1.875rem 0 0; border:0; background:none; text-align:left; cursor:pointer;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; outline:none}
+.multi-btn:focus-visible{box-shadow:none}
+.multi-panel{position:absolute; top:calc(100% + 0.25rem); left:-1px; right:-1px; z-index:25; min-width:17.5rem; max-height:24rem; overflow:auto;
+  padding:0.375rem; background:var(--blanco-base); border:1px solid var(--gris-20); border-radius:var(--radius-s); box-shadow:var(--elevation-03)}
+.multi-op{display:flex; align-items:center; gap:0.625rem; padding:0.4375rem 0.5rem; border-radius:var(--radius-s); font-size:0.9375rem; cursor:pointer}
+.multi-op:hover{background:var(--gris-5)}
+.multi-op input{width:1.125rem; height:1.125rem; margin:0; flex:none; accent-color:var(--primario-darken-1)}
+.multi-todos{font-weight:500; margin-bottom:0.25rem; border-bottom:1px solid var(--gris-10); border-radius:var(--radius-s) var(--radius-s) 0 0}
+.enlace{display:flex; align-items:center; gap:0.5rem; padding:0.75rem 1rem; border:0; border-radius:var(--radius-s); background:none; font-size:1rem; color:var(--primario-darken-1); cursor:pointer}
+.enlace:hover{color:var(--primario-darken-2); background:var(--secundario-base)}
+.estado{margin-left:auto; display:flex; align-items:center; gap:0.5rem; font-size:0.9375rem; color:var(--gris-60); text-align:right}
+
+/* ---------- Avisos ---------- */
+.avisos{display:flex; flex-direction:column; gap:0.75rem}
+.aviso{display:flex; align-items:flex-start; gap:0.75rem; padding:0.75rem 1rem; border-radius:var(--radius-m); background:var(--blanco-base);
+  border:1px solid var(--gris-20); font-size:0.9375rem}
+.aviso .ico{margin-top:0.0625rem}
+.aviso--alerta{background:var(--advertencia-lighten-5); border-color:var(--advertencia-lighten-3)}
+.aviso--alerta .ico{color:var(--chart-estado-alerta)}
+.aviso--error{background:var(--error-lighten-5); border-color:var(--error-lighten-3)}
+.aviso--error .ico{color:var(--error-darken-3)}
+.aviso--info .ico{color:var(--primario-darken-1)}
+.aviso[hidden]{display:none}
+
+.pagina{display:flex; flex-direction:column; gap:1.25rem}
+.pagina[hidden]{display:none}
+.tarjeta{background:var(--blanco-base); border-radius:var(--radius-m); box-shadow:var(--elevation-01); padding:1.25rem; min-width:0}
+.col{display:flex; flex-direction:column; gap:0.875rem}
+.fila{display:flex; gap:1.25rem; align-items:stretch}
+.fila > .mitad{flex:1 1 0; min-width:0}
+.fila > .ancho{flex:3 1 0; min-width:0}
+.fila > .angosto{flex:2 1 0; min-width:0}
+
+/* ---------- KPI ---------- */
+.kpis{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:1.25rem}
+.kpi{display:flex; flex-direction:column; gap:0.5rem}
+.kpi-rot{display:flex; align-items:center; gap:0.625rem; font-size:0.9375rem; color:var(--gris-60); min-height:2.6em}
+.kpi-rot .ico{color:var(--primario-darken-1)}
+.kpi-rot--verde .ico{color:var(--exito-darken-3)}
+.kpi-rot--rojo .ico{color:var(--error-darken-3)}
+.kpi-rot--ambar .ico{color:var(--chart-estado-alerta)}
+.kpi-num{font-family:var(--font-slab); font-size:2.5rem; font-weight:700; line-height:1; font-variant-numeric:tabular-nums}
+.kpi-num--verde{color:var(--exito-darken-3)}
+.kpi-num--rojo{color:var(--error-darken-3)}
+.kpi-num--ambar{color:var(--chart-estado-alerta)}
+.kpi-pie{font-size:0.8125rem; color:var(--gris-60)}
+/* Variación contra el periodo de comparación: siempre en tinta neutra (flecha + cifra), nunca verde/rojo */
+.var{font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--negro-text)}
+.var--sin{color:var(--gris-60)}
+.kpi-var{font-size:0.8125rem; min-height:1.2em}
+
+/* ---------- Tarjetas de gráfico ---------- */
+.t-cab{display:flex; align-items:center; gap:0.5rem 1.25rem; flex-wrap:wrap}
+.t-cab h2{margin:0; font-size:1.1875rem; font-weight:500; line-height:1.3}
+.t-sub{margin:-0.5rem 0 0; font-size:0.875rem; color:var(--gris-60)}
+.leyenda{display:flex; flex-wrap:wrap; gap:0.375rem 1rem; font-size:0.875rem; color:var(--gris-60)}
+.leyenda span{display:flex; align-items:center; gap:0.5rem}
+.k-linea{width:1.25rem; height:3px; border-radius:2px; display:block}
+.k-caja{width:0.75rem; height:0.75rem; border-radius:2px; display:block}
+.lienzo{position:relative; flex:1; min-height:18rem}
+.lienzo > svg{position:absolute; inset:0; display:block; overflow:visible}
+.vacio{display:grid; place-items:center; min-height:6rem; color:var(--gris-60); text-align:center; font-size:0.9375rem}
+.seg{display:inline-flex; margin-left:auto; border:1px solid var(--gris-20); border-radius:var(--radius-s); overflow:hidden}
+.seg button{padding:0.4375rem 0.75rem; border:0; background:var(--blanco-base); font-size:0.8125rem; cursor:pointer}
+.seg button + button{border-left:1px solid var(--gris-20)}
+.seg button:hover{background:var(--gris-5)}
+.seg button[aria-pressed="true"]{background:var(--primario-darken-1); color:var(--blanco-base)}
+
+/* Colores de estado (verde dentro, ámbar próxima, rojo vencida, gris en proceso sin juicio) */
+.c-ok{background:var(--chart-estado-bueno)}
+.c-prox{background:var(--chart-estado-alerta)}
+.c-venc{background:var(--chart-estado-critico)}
+.c-proc{background:var(--gris-40)}
+
+/* Barras de plazo (tarjeta «Cumplimiento según plazo») */
+.plazo{display:flex; flex-direction:column; gap:0.375rem}
+.plazo + .plazo{margin-top:0.5rem}
+.plazo-tit{display:flex; align-items:baseline; gap:0.75rem; font-weight:500}
+.plazo-tit b{font-family:var(--font-slab); font-size:1.25rem; font-variant-numeric:tabular-nums}
+.apilada{display:flex; height:1.75rem; border-radius:var(--radius-s); overflow:hidden; background:var(--gris-5); gap:2px}
+.apilada span{display:block; min-width:2px}
+.plazo-det{display:flex; flex-wrap:wrap; gap:0.25rem 1.25rem; font-size:0.875rem; color:var(--gris-70)}
+.plazo-det span{display:flex; align-items:center; gap:0.5rem}
+.plazo-det b{font-variant-numeric:tabular-nums; color:var(--negro-text)}
+.plazo-nota{font-size:0.8125rem; color:var(--gris-60)}
+
+/* Listas de barras */
+.barras{display:flex; flex-direction:column; gap:2px; margin:0 -4px}
+.barra-fila{display:grid; grid-template-columns:minmax(0,12.5rem) minmax(0,1fr) 8.5rem; align-items:center; gap:0.75rem; width:100%;
+  padding:0.1875rem 0.25rem; border:0; border-radius:var(--radius-s); background:none; font-size:0.875rem; text-align:left; cursor:pointer}
+.barra-fila:hover{background:var(--gris-5)}
+.barras.con-sel .barra-fila[aria-pressed="true"]{background:var(--secundario-base)}
+.barras.con-sel .barra-fila:not([aria-pressed="true"]) .apilada span,.barras.con-sel .barra-fila:not([aria-pressed="true"]) .relleno{opacity:.35}
+.barra-fila--v2{grid-template-columns:minmax(0,9rem) minmax(0,1fr) 11.5rem}
+.barra-fila--cmp{grid-template-columns:minmax(0,9rem) minmax(0,1fr) 13rem}
+.barra-fila--nom-largo{grid-template-columns:minmax(0,11.5rem) minmax(0,1fr) 11.5rem}
+.barra-fila--cmp.barra-fila--nom-largo{grid-template-columns:minmax(0,11.5rem) minmax(0,1fr) 13rem}
+.barra-fila--cmp-rank{grid-template-columns:minmax(0,12.5rem) minmax(0,1fr) 12rem}
+.barra-nom{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pista{height:0.875rem; background:var(--gris-5); border-radius:var(--radius-s); overflow:hidden}
+.pista .apilada{height:100%; border-radius:0; background:none; gap:0}
+.relleno{display:block; height:100%; background:var(--primario-darken-1); border-radius:0 var(--radius-s) var(--radius-s) 0}
+.relleno--bajo{background:var(--gris-40)}
+.barra-val{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+.barra-val b{font-weight:500}
+.barra-val small{color:var(--gris-60); font-size:0.75rem}
+.nota{margin:0; font-size:0.8125rem; color:var(--gris-60)}
+
+/* ---------- Tablas ---------- */
+.tabla-caja{overflow:auto; max-width:100%}
+table.datos{border-collapse:collapse; width:100%; font-size:max(12px,0.8125rem); background:var(--blanco-base)}
+table.datos thead th{position:sticky; top:0; background:var(--primario-darken-1); color:var(--blanco-base); text-align:right; padding:0.5rem 0.625rem;
+  font-weight:700; vertical-align:bottom; white-space:normal; line-height:1.25}
+table.datos thead th:first-child,table.datos th.izq{text-align:left}
+table.datos th button{all:unset; display:inline-flex; align-items:flex-end; gap:0.25rem; cursor:pointer; text-align:inherit; font-weight:700; border-radius:var(--radius-s)}
+table.datos th button:focus-visible{box-shadow:0 0 0 2px var(--blanco-base)}
+table.datos th button .flecha{opacity:.55; font-size:0.75em}
+table.datos th[aria-sort] button .flecha{opacity:1}
+table.datos td,table.datos tbody th{padding:0.3125rem 0.625rem; border-bottom:1px solid var(--gris-10); text-align:right; font-variant-numeric:tabular-nums}
+table.datos tbody th{text-align:left; font-weight:400}
+table.datos td.izq{text-align:left}
+table.datos tbody tr:nth-child(even){background:var(--gris-5)}
+table.datos tbody tr.reg-sel{background:var(--secundario-base)}
+table.datos tfoot td,table.datos tfoot th{font-weight:700; border-top:2px solid var(--gris-30); background:var(--blanco-base); text-align:right; padding:0.4375rem 0.625rem}
+table.datos tfoot th{text-align:left}
+table.datos .btn-fila{all:unset; cursor:pointer; color:var(--primario-darken-1); border-radius:var(--radius-s)}
+table.datos .btn-fila:hover{text-decoration:underline}
+table.datos .btn-fila:focus-visible{box-shadow:var(--focus-ring)}
+.marca{position:relative; display:inline-flex; vertical-align:middle; margin-left:0.25rem}   /* contiene su .oculto-vis: si no, escapa del scroll de la tabla y ensancha la página */
+.marca .ico{width:1rem; height:1rem}
+.marca--ok .ico{color:var(--exito-darken-3)}
+.marca--mal .ico{color:var(--error-darken-3)}
+.t-bajo{color:var(--gris-60)}
+tr.f-venc td,tr.f-venc th{background:var(--error-lighten-5)}
+tr.f-prox td,tr.f-prox th{background:var(--advertencia-lighten-5)}
+.plazo-ico{display:inline-flex; align-items:center; gap:0.375rem; white-space:nowrap}
+.plazo-ico .ico{width:1.125rem; height:1.125rem}
+.plazo-ico--venc .ico{color:var(--error-darken-3)}
+.plazo-ico--prox .ico{color:var(--chart-estado-alerta)}
+.plazo-ico--ok .ico{color:var(--exito-darken-3)}
+.tabla-gemela summary{font-size:0.875rem; font-weight:500; color:var(--primario-darken-1); cursor:pointer; width:max-content; border-radius:var(--radius-s)}
+.tabla-gemela .tabla-caja{max-height:17rem; margin-top:0.5rem}
+
+/* Mapa de calor materia × región: más oscuro = menor cumplimiento (relativo a la propia tabla) */
+.calor td.cal{padding:0; text-align:center}
+.calor td.cal button{all:unset; box-sizing:border-box; display:block; width:100%; padding:0.3125rem 0.5rem; cursor:pointer; text-align:center;
+  font-variant-numeric:tabular-nums; border-radius:2px}
+.calor td.cal button:hover{outline:2px solid var(--primario-darken-2); outline-offset:-2px}
+.calor td.cal button:focus-visible{box-shadow:var(--focus-ring)}
+.calor td.cal small{display:block; font-size:0.6875rem; opacity:.85; line-height:1.1}
+.calor td.cal--oscura button{color:var(--blanco-base)}
+.calor td.cal--bajo button{color:var(--gris-60)}
+.calor td.cal--sel button{outline:2px solid var(--primario-darken-2); outline-offset:-2px}
+.calor-esc{display:flex; align-items:center; gap:0.5rem; font-size:0.8125rem; color:var(--gris-60)}
+.calor-esc i{display:block; width:7rem; height:0.625rem; border-radius:2px; border:1px solid var(--gris-20);
+  background:linear-gradient(to right,var(--blanco-base),color-mix(in srgb,var(--primario-darken-1) 75%,var(--blanco-base)))}
+/* Por vencer */
+.xvencer{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0.75rem}
+.xv{display:flex; flex-direction:column; gap:0.125rem; padding:0.625rem 0.875rem; border:1px solid var(--advertencia-lighten-3); border-radius:var(--radius-m); background:var(--advertencia-lighten-5)}
+.xv b{font-family:var(--font-slab); font-size:1.75rem; line-height:1.1; font-variant-numeric:tabular-nums}
+.xv span{font-size:0.8125rem; color:var(--gris-70)}
+.columna{display:flex; flex-direction:column; gap:1.25rem}
+.ctrl{display:flex; flex-wrap:wrap; align-items:center; gap:0.75rem}
+.ctrl label.campo{display:flex; align-items:center; gap:0.5rem; font-size:0.875rem; color:var(--gris-60)}
+.ctrl input[type=search],.ctrl select{height:2.5rem; padding:0 0.75rem; border:1px solid var(--gris-20); border-radius:var(--radius-s); background:var(--blanco-base);
+  font:inherit; font-size:0.9375rem; color:var(--negro-text)}
+.ctrl input[type=search]{width:13rem}
+.ctrl .espacio{margin-left:auto}
+.btn-pri,.btn-sec{display:inline-flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; min-height:2.5rem; border-radius:var(--radius-s); font-size:0.9375rem; cursor:pointer}
+.btn-pri{border:0; background:var(--primario-darken-1); color:var(--blanco-base); font-weight:500}
+.btn-pri:hover{background:var(--primario-darken-2)}
+.btn-pri:disabled{background:var(--gris-20); color:var(--gris-50); cursor:not-allowed}
+.btn-sec{border:1px solid var(--gris-20); background:var(--blanco-base)}
+.btn-sec:hover:not(:disabled){background:var(--gris-5)}
+.btn-sec:disabled{color:var(--gris-40); cursor:not-allowed}
+.pie-tabla{display:flex; flex-wrap:wrap; align-items:center; gap:0.75rem; font-size:0.875rem; color:var(--gris-60)}
+.pie-tabla .espacio{margin-left:auto; display:flex; align-items:center; gap:0.5rem}
+
+/* ---------- Tooltip y diálogos ---------- */
+.tip{position:fixed; z-index:30; min-width:11rem; max-width:20rem; padding:0.625rem 0.75rem; background:var(--blanco-base); border-radius:var(--radius-m);
+  box-shadow:var(--elevation-03); font-size:max(12px,0.8125rem); pointer-events:none}
+.tip[hidden]{display:none}
+.tip-tit{font-weight:500; margin-bottom:0.25rem}
+.tip-fila{display:flex; align-items:center; gap:0.5rem; line-height:1.7}
+.tip-fila b{font-weight:700; font-variant-numeric:tabular-nums; min-width:3.5rem; text-align:right}
+.tip-fila span{color:var(--gris-60)}
+.tip-k{width:0.625rem; height:0.625rem; border-radius:2px; flex:none}
+dialog{border:0; border-radius:var(--radius-m); box-shadow:var(--elevation-04); padding:0; max-width:44rem; width:calc(100% - 2rem); max-height:88vh; color:inherit}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+.dlg-cab{display:flex; align-items:center; padding:1.25rem 1.5rem; border-bottom:1px solid var(--gris-10); position:sticky; top:0; background:var(--blanco-base)}
+.dlg-cab h2{margin:0; font-size:1.1875rem; font-weight:500}
+.dlg-cab button{margin-left:auto; border:0; background:none; width:2.25rem; height:2.25rem; border-radius:var(--radius-s); display:grid; place-items:center; cursor:pointer}
+.dlg-cab button:hover{background:var(--gris-5)}
+dialog dl{margin:0; padding:0.5rem 1.5rem 1.5rem}
+dialog dt{font-weight:700; margin-top:1rem}
+dialog dd{margin:0.25rem 0 0; color:var(--gris-70); font-size:0.9375rem}
+dialog .dlg-cuerpo{padding:0.5rem 1.5rem 1.5rem; font-size:0.9375rem}
+dialog ul{padding-left:1.25rem; margin:0.5rem 0}
+
+/* ---------- Responsive ---------- */
+@media (max-width:1599px){.btn-largo{display:none}}
+@media (max-width:1500px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:1200px){.fila:not(.fila--tres){flex-direction:column}}
+/* Espacio, tipo de consulta y materia van en una misma fila; con poco ancho pasan a dos y una (o una por fila). */
+.fila--tres{flex-wrap:wrap}
+.fila--tres > .mitad{flex:1 1 21rem}
+/* Barras compactas: el n de cada fila y la unidad «pp» quedan en el tooltip / glosario */
+.fila--tres .barra-fila.barra-fila{grid-template-columns:minmax(0,7.5rem) minmax(0,1fr) 6.25rem; gap:0.5rem}
+.fila--tres .barra-val small,.fila--tres .var .u{display:none}
+@media (max-width:760px){
+  .cab{padding:0.875rem 1rem; gap:0.5rem 0.75rem; flex-wrap:wrap; min-height:0}
+  .cab img{height:2.5rem}
+  .cab-txt{margin-left:0; flex:1 1 12rem}
+  .cab h1{font-size:1.125rem}
+  .cab p{font-size:0.8125rem}
+  .cab-der{margin-left:0; width:100%; gap:0.5rem}
+  .sello{align-items:flex-start; margin-right:auto; font-size:0.8125rem}
+  .btn-borde{width:2.75rem; height:2.75rem; padding:0; justify-content:center; flex:none}
+  .btn-txt{display:none}
+  .cuerpo{flex-direction:column}
+  .menu{width:auto; flex-direction:row; padding:0; border-right:0; border-bottom:1px solid var(--gris-10)}
+  .app.cerrado .menu{width:auto}
+  .app.cerrado .txt{display:inline}
+  .menu-cab,.menu-pie{display:none}
+  .pag{justify-content:center; padding:0.75rem; border-left:0; border-bottom:3px solid transparent; font-size:0.9375rem}
+  .pag[aria-current="page"]{border-bottom-color:var(--primario-darken-1)}
+  .contenido{padding:1rem; gap:1rem; overflow:visible}
+  .chip,.chip--fecha{flex:1 1 100%; max-width:none}
+  .estado{margin-left:0; text-align:left}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.75rem}
+  .tarjeta{padding:1rem}
+  .kpi-num{font-size:1.625rem}
+  .barra-fila{grid-template-columns:minmax(0,7.5rem) minmax(0,1fr) 5.5rem; gap:0.5rem}
+  .barra-fila.barra-fila--cmp,.barra-fila.barra-fila--cmp-rank,.barra-fila.barra-fila--nom-largo,.barra-fila--cmp.barra-fila--nom-largo{grid-template-columns:minmax(0,6.5rem) minmax(0,1fr) 7.5rem}
+  .barra-val{white-space:normal}
+  .xvencer{grid-template-columns:minmax(0,1fr)}
+  .ctrl .espacio{margin-left:0}
+}
+@media (min-width:1024px) and (min-height:600px){
+  .app{height:100vh; min-height:0}
+  .cuerpo{min-height:0; overflow:hidden}
+}
+@media (pointer:coarse){.barra-fila,.seg button,.enlace,.multi-op{min-height:2.75rem}}
+
+/* ---------- Impresión (PDF) ---------- */
+@media print{
+  @page{size:A4 landscape; margin:12mm}
+  *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  html,body{height:auto; background:#fff}
+  .app{display:block; height:auto}
+  .cuerpo{display:block; overflow:visible}
+  .menu,.filete,.barra-pie,.btn-borde,.seg,.enlace,.ctrl,.pie-tabla,.tabla-gemela summary,.multi-btn + .chip-flecha{display:none !important}
+  .cab{padding:0 0 4mm; min-height:0; background:#fff; color:var(--negro-text); border-bottom:3px solid var(--primario-base)}
+  .cab h1{font-size:18pt; color:var(--primario-darken-2)} .cab p,.sello{color:var(--gris-70)}
+  .contenido{padding:4mm 0; overflow:visible}
+  .tarjeta{box-shadow:none; border:1px solid var(--gris-10); break-inside:avoid}
+  .pagina[hidden]{display:none !important}
+  .tabla-caja{max-height:none !important; overflow:visible}
+  table.datos thead th{position:static}
+  .kpis{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .tip{display:none}
+  /* Resumen de una página: solo se imprime cuando se pide con el botón «Resumen 1 página» */
+  #hoja-resumen{display:none}
+  body.imp-resumen .app,body.imp-resumen dialog,body.imp-resumen .tip{display:none !important}
+  body.imp-resumen #hoja-resumen{display:block}
+}
+/* ---------- Hoja de resumen (una página A4 horizontal) ---------- */
+#hoja-resumen{display:none; font-size:9pt; color:var(--negro-text); background:var(--blanco-base)}
+.hj-cab{display:flex; justify-content:space-between; align-items:flex-end; gap:6mm; border-bottom:3px solid var(--primario-base); padding-bottom:2mm; margin-bottom:3mm}
+.hj-cab h1{margin:0; font-family:var(--font-brand); font-size:16pt; line-height:1.1; color:var(--primario-darken-2)}
+.hj-cab p{margin:0.5mm 0 0; font-size:8pt; color:var(--gris-70)}
+.hj-cab .der{text-align:right}
+.hj-kpis{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:2mm}
+.hj-k{border:1px solid var(--gris-20); border-radius:2mm; padding:1.5mm 2mm; display:flex; flex-direction:column; gap:0.4mm}
+.hj-k small{font-size:6.5pt; color:var(--gris-60); line-height:1.2}
+.hj-k b{font-family:var(--font-slab); font-size:14pt; line-height:1.1; font-variant-numeric:tabular-nums}
+.hj-k .var{font-size:7pt}
+.hj-cols{display:grid; grid-template-columns:1.3fr 1fr; gap:4mm; margin-top:3mm}
+.hj-sec h2{margin:0 0 1mm; font-size:9pt; font-weight:700; color:var(--primario-darken-2)}
+.hj-sec p{margin:0 0 1mm; font-size:7pt; color:var(--gris-60)}
+.hj-evo{width:100%; height:50mm; position:relative}
+.hj-evo svg{display:block}
+.hj-fila{display:grid; grid-template-columns:27mm minmax(0,1fr) 43mm; gap:2mm; align-items:center; font-size:7.5pt; line-height:1.5}
+.hj-fila .p{height:2.6mm; background:var(--gris-5); border-radius:1mm; overflow:hidden}
+.hj-fila .p i{display:block; height:100%; background:var(--primario-darken-1)}
+.hj-fila .v{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+.hj-listas{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4mm; margin-top:3mm}
+.hj-listas ol,.hj-listas ul{margin:0; padding-left:4mm; font-size:7.5pt; line-height:1.45}
+.hj-listas li span{color:var(--gris-60)}
+.hj-pie{margin-top:3mm; padding-top:1.5mm; border-top:1px solid var(--gris-20); font-size:6.5pt; color:var(--gris-60)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <header class="cab">
+    <img src="ds/assets/logos/minbienes-blanco.png" alt="Ministerio de Bienes Nacionales">
+    <div class="cab-txt">
+      <h1>CONSULTAS CIUDADANAS SIAC</h1>
+      <p>Seguimiento de plazos de respuesta · Ministerio de Bienes Nacionales</p>
+    </div>
+    <div class="cab-der">
+      <div class="sello" role="status">
+        <div><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="update"></svg><span id="sello-act">Actualizado —</span></div>
+        <div><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="calendario"></svg><span id="sello-corte">Datos al —</span></div>
+      </div>
+      <button type="button" class="btn-borde" id="copiar-enlace" aria-label="Copiar enlace de esta vista" title="Copiar un enlace a esta vista, con sus filtros"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="enlace"></svg><span class="btn-txt" id="copiar-txt">Copiar enlace</span></button>
+      <button type="button" class="btn-borde" id="hoja" aria-label="Resumen de una página" title="Resumen de una página para reuniones (con los filtros actuales)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="documento"></svg><span class="btn-txt">Resumen</span></button>
+      <button type="button" class="btn-borde" id="pdf" aria-label="Exportar PDF" title="Exportar PDF (la página actual)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="imprimir"></svg><span class="btn-txt"><span class="btn-largo">Exportar </span>PDF</span></button>
+    </div>
+  </header>
+  <div class="filete"></div>
+
+  <div class="cuerpo">
+    <nav class="menu" aria-label="Secciones">
+      <div class="menu-cab">
+        <span class="menu-rot txt">SECCIONES</span>
+        <button type="button" class="menu-alt" id="menu-alt" aria-label="Retraer panel" aria-expanded="true"><svg class="ico ico--24" viewBox="0 0 24 24" aria-hidden="true" data-i="menu_open"></svg></button>
+      </div>
+      <button type="button" class="pag" data-pag="resumen" title="Resumen ejecutivo"><svg class="ico ico--24" viewBox="0 0 24 24" aria-hidden="true" data-i="dashboard"></svg><span class="txt">Resumen ejecutivo</span></button>
+      <button type="button" class="pag" data-pag="regional" title="Gestión regional"><svg class="ico ico--24" viewBox="0 0 24 24" aria-hidden="true" data-i="mapa"></svg><span class="txt">Gestión regional</span></button>
+      <div class="menu-pie">
+        <button type="button" id="abrir-calidad" title="Calidad de los datos"><svg class="ico ico--22" viewBox="0 0 24 24" aria-hidden="true" data-i="listo"></svg><span class="txt">Calidad de los datos</span></button>
+        <button type="button" id="abrir-glosario" title="Glosario y reglas"><svg class="ico ico--22" viewBox="0 0 24 24" aria-hidden="true" data-i="ayuda"></svg><span class="txt">Glosario y reglas</span></button>
+      </div>
+    </nav>
+
+    <main class="contenido" id="contenido">
+      <div class="filtros" id="filtros" role="group" aria-label="Filtros">
+        <div class="filtros-hoja">
+          <label class="chip chip--fecha"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="calendario"></svg><span class="chip-rot">Ingreso desde:</span><input type="date" id="f-desde"></label>
+          <label class="chip chip--fecha"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="calendario"></svg><span class="chip-rot">hasta:</span><input type="date" id="f-hasta"></label>
+          <div class="chip multi" id="m-consultas" data-ico="categoria" data-rot="Consulta:"></div>
+          <div class="chip multi" id="m-espacios" data-ico="entrada" data-rot="Espacio:"></div>
+          <div class="chip multi" id="m-materias" data-ico="documento" data-rot="Materia:"></div>
+          <div class="chip multi" id="m-regiones" data-ico="globo" data-rot="Región/oficina:"></div>
+          <label class="chip chip--cmp" title="Periodo contra el que se comparan las variaciones (▲▼) del Resumen"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="update"></svg><span class="chip-rot">Comparar con:</span>
+            <select id="f-cmp" aria-label="Comparar con"><option value="anterior">Periodo anterior</option><option value="anio">Año anterior</option><option value="ninguno">Sin comparar</option></select></label>
+          <button type="button" class="enlace" id="f-reset"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="reiniciar"></svg>Restablecer filtros</button>
+        </div>
+        <div class="estado" id="estado" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="avisos" id="avisos"></div>
+
+      <!-- ======================= RESUMEN EJECUTIVO ======================= -->
+      <section class="pagina" id="p-resumen" aria-label="Resumen ejecutivo">
+        <div class="kpis" id="kpis"></div>
+
+        <div class="fila">
+          <div class="tarjeta col angosto">
+            <div class="t-cab"><h2>Cumplimiento según plazo</h2></div>
+            <p class="t-sub">Plazo institucional: 10 días hábiles. Finalizadas y en proceso se miden por separado.</p>
+            <div id="plazo"></div>
+            <div class="leyenda" aria-hidden="true">
+              <span><i class="k-caja c-ok"></i>Dentro de plazo</span>
+              <span><i class="k-caja c-prox"></i>Próxima a vencer (parte de «dentro de plazo»)</span>
+              <span><i class="k-caja c-venc"></i>Fuera de plazo / vencida</span>
+            </div>
+          </div>
+          <div class="tarjeta col ancho">
+            <div class="t-cab"><h2>Evolución mensual del cumplimiento</h2>
+              <div class="leyenda" aria-hidden="true"><span><i class="k-linea" style="background:var(--primario-darken-1)"></i>% finalizadas dentro de plazo</span></div></div>
+            <p class="t-sub" id="evo-sub"></p>
+            <div class="avisos"><div class="aviso aviso--alerta" id="evo-parcial" hidden></div></div>
+            <div class="lienzo" id="evo" tabindex="0" role="img" aria-label="Evolución mensual del porcentaje de consultas finalizadas dentro de plazo"></div>
+            <details class="tabla-gemela" id="evo-tabla"><summary>Ver tabla de datos</summary><div class="tabla-caja" id="evo-tabla-caja"></div></details>
+          </div>
+        </div>
+
+        <div class="fila">
+          <div class="tarjeta col mitad">
+            <div class="t-cab"><h2>Ranking regional por cantidad</h2></div>
+            <p class="t-sub">Consultas por región/oficina, de mayor a menor volumen. Clic en una barra para filtrar.</p>
+            <div class="leyenda" aria-hidden="true">
+              <span><i class="k-caja c-ok"></i>Finalizadas dentro de plazo</span>
+              <span><i class="k-caja c-venc"></i>Finalizadas fuera de plazo</span>
+              <span><i class="k-caja c-proc"></i>En proceso</span>
+            </div>
+            <div class="barras" id="rank-cant"></div>
+          </div>
+          <div class="tarjeta col mitad">
+            <div class="t-cab"><h2>Ranking regional por cumplimiento</h2></div>
+            <p class="t-sub" id="rank-pct-sub"></p>
+            <div class="barras" id="rank-pct"></div>
+          </div>
+        </div>
+
+        <div class="fila fila--tres">
+          <div class="tarjeta col mitad">
+            <div class="t-cab"><h2>Cumplimiento por espacio de atención</h2></div>
+            <p class="t-sub">Sobre las consultas finalizadas de cada espacio. Clic para filtrar todo el panel.</p>
+            <div class="barras" id="esp"></div>
+          </div>
+          <div class="tarjeta col mitad">
+            <div class="t-cab"><h2>Cumplimiento por tipo de consulta</h2></div>
+            <p class="t-sub">Sobre las consultas finalizadas de cada tipo. Clic para filtrar todo el panel.</p>
+            <div class="barras" id="con"></div>
+          </div>
+          <div class="tarjeta col mitad">
+            <div class="t-cab"><h2>Cumplimiento por materia</h2></div>
+            <p class="t-sub">Sobre las consultas finalizadas de cada materia (motivo de consulta agrupado). Clic para filtrar todo el panel.</p>
+            <div class="barras" id="mat"></div>
+          </div>
+        </div>
+
+        <div class="tarjeta col">
+          <div class="t-cab"><h2>Cumplimiento por consulta y región</h2>
+            <div class="calor-esc" aria-hidden="true"><span>Mayor cumplimiento</span><i></i><span>Menor cumplimiento</span></div></div>
+          <p class="t-sub" id="cal-sub"></p>
+          <div class="tabla-caja"><table class="datos calor" id="tabla-calor"></table></div>
+          <p class="nota" id="cal-nota"></p>
+        </div>
+
+        <div class="tarjeta col">
+          <div class="t-cab"><h2>Indicadores por región/oficina</h2></div>
+          <p class="t-sub" id="reg-sub"></p>
+          <div class="tabla-caja"><table class="datos" id="tabla-reg"></table></div>
+          <p class="nota" id="reg-nota"></p>
+        </div>
+      </section>
+
+      <!-- ======================= GESTIÓN REGIONAL ======================= -->
+      <section class="pagina" id="p-regional" aria-label="Gestión regional" hidden>
+        <div class="fila">
+          <div class="tarjeta col mitad">
+            <div class="t-cab"><h2>Antigüedad de las consultas en proceso</h2></div>
+            <p class="t-sub" id="ant-sub"></p>
+            <div class="lienzo" id="ant" tabindex="0" role="img" aria-label="Distribución de consultas en proceso por días hábiles transcurridos"></div>
+            <details class="tabla-gemela"><summary>Ver tabla de datos</summary><div class="tabla-caja" id="ant-tabla-caja"></div></details>
+          </div>
+          <div class="tarjeta col mitad">
+            <div class="t-cab"><h2>Consultas en proceso por región</h2>
+              <div class="seg" role="group" aria-label="Ordenar" id="reg-orden">
+                <button type="button" data-o="proc" aria-pressed="true">Carga total</button>
+                <button type="button" data-o="venc" aria-pressed="false">Vencidas</button>
+                <button type="button" data-o="pct" aria-pressed="false">% vencidas</button>
+              </div></div>
+            <p class="t-sub" id="pr-sub"></p>
+            <div class="leyenda" aria-hidden="true">
+              <span><i class="k-caja c-venc"></i>Vencidas (más de 10 días hábiles)</span>
+              <span><i class="k-caja c-prox"></i>Próximas a vencer (8 a 10)</span>
+              <span><i class="k-caja c-ok"></i>Resto, dentro de plazo (0 a 7)</span>
+            </div>
+            <div class="barras" id="proc-reg"></div>
+          </div>
+        </div>
+
+        <div class="tarjeta col">
+          <div class="t-cab"><h2>Por vencer en los próximos 3 días hábiles</h2></div>
+          <p class="t-sub" id="xv-sub"></p>
+          <div class="xvencer" id="xv-tot"></div>
+          <div class="barras" id="xv-reg"></div>
+        </div>
+
+        <div class="tarjeta col">
+          <div class="t-cab"><h2>Consultas en proceso</h2></div>
+          <p class="t-sub" id="pend-sub"></p>
+          <div class="ctrl">
+            <label class="campo">Folio <input type="search" id="p-folio" placeholder="Buscar folio" aria-label="Buscar por folio"></label>
+            <label class="campo">Plazo
+              <select id="p-estado"><option value="">Todos</option><option value="vencida">Vencidas</option><option value="proxima">Próximas a vencer</option><option value="enPlazo">Dentro de plazo</option></select></label>
+            <label class="campo">Región <select id="p-region"></select></label>
+            <button type="button" class="enlace" id="p-reset" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="reiniciar"></svg>Quitar filtros de la tabla</button>
+            <button type="button" class="btn-pri espacio" id="p-excel"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" data-i="descarga"></svg>Exportar a Excel</button>
+          </div>
+          <div class="tabla-caja"><table class="datos" id="tabla-pend"></table></div>
+          <div class="pie-tabla">
+            <span id="p-rango"></span>
+            <span class="espacio">
+              <button type="button" class="btn-sec" id="p-ant">Anterior</button>
+              <span id="p-pag"></span>
+              <button type="button" class="btn-sec" id="p-sig">Siguiente</button>
+            </span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="barra-pie"></div>
+</div>
+
+<dialog id="dlg-glosario" aria-labelledby="glo-tit">
+  <div class="dlg-cab"><h2 id="glo-tit">Glosario y reglas de cálculo</h2>
+    <button type="button" data-cerrar aria-label="Cerrar"><svg class="ico ico--22" viewBox="0 0 24 24" aria-hidden="true" data-i="cerrar"></svg></button></div>
+  <dl id="glosario"></dl>
+</dialog>
+<dialog id="dlg-calidad" aria-labelledby="cal-tit">
+  <div class="dlg-cab"><h2 id="cal-tit">Calidad de los datos</h2>
+    <button type="button" data-cerrar aria-label="Cerrar"><svg class="ico ico--22" viewBox="0 0 24 24" aria-hidden="true" data-i="cerrar"></svg></button></div>
+  <div class="dlg-cuerpo" id="calidad"></div>
+</dialog>
+<div class="tip" id="tip" hidden></div>
+<section id="hoja-resumen" aria-hidden="true"></section>
+
+<script src="datos.js"></script>
+<script src="estado.js" onerror="void 0"></script>
+<script src="agregar.js"></script>
+<script src="exportar.js"></script>
+<script src="panel.js"></script>
+</body>
+</html>
