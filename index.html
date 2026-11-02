@@ -63,8 +63,9 @@ button{font:inherit; color:inherit}
 .pag:hover{background:var(--gris-5)}
 .pag[aria-current="page"]{background:var(--secundario-base); color:var(--primario-darken-1); border-left-color:var(--primario-darken-1); font-weight:500}
 .menu-pie{margin-top:auto; padding:1.5rem 1.375rem 0; border-top:1px solid var(--gris-10); display:flex; flex-direction:column; gap:0.5rem}
-.menu-pie button{display:flex; align-items:center; gap:0.875rem; padding:0.25rem 0; border:0; background:none; font-size:0.9375rem; color:var(--gris-60); cursor:pointer; white-space:nowrap}
-.menu-pie button:hover{color:var(--primario-darken-1)}
+.menu-pie a{text-decoration:none}
+.menu-pie button,.menu-pie a{display:flex; align-items:center; gap:0.875rem; padding:0.25rem 0; border:0; background:none; font-size:0.9375rem; color:var(--gris-60); cursor:pointer; white-space:nowrap}
+.menu-pie button:hover,.menu-pie a:hover{color:var(--primario-darken-1)}
 
 /* ---------- Contenido y filtros ---------- */
 .contenido{position:relative; flex:1; min-width:0; padding:2rem; display:flex; flex-direction:column; gap:1.25rem; overflow:auto}
@@ -405,6 +406,7 @@ dialog ul{padding-left:1.25rem; margin:0.5rem 0}
       <button type="button" class="pag" data-pag="resumen" title="Resumen ejecutivo"><svg class="ico ico--24" viewBox="0 0 24 24" aria-hidden="true" data-i="dashboard"></svg><span class="txt">Resumen ejecutivo</span></button>
       <button type="button" class="pag" data-pag="regional" title="Gestión regional"><svg class="ico ico--24" viewBox="0 0 24 24" aria-hidden="true" data-i="mapa"></svg><span class="txt">Gestión regional</span></button>
       <div class="menu-pie">
+        <a href="https://lab-reportes.bienes.cl/" target="_top" title="Ir al Centro de Paneles"><svg class="ico ico--22" viewBox="0 0 24 24" aria-hidden="true" data-i="home"></svg><span class="txt">Centro de Paneles</span></a>
         <button type="button" id="abrir-calidad" title="Calidad de los datos"><svg class="ico ico--22" viewBox="0 0 24 24" aria-hidden="true" data-i="listo"></svg><span class="txt">Calidad de los datos</span></button>
         <button type="button" id="abrir-glosario" title="Glosario y reglas"><svg class="ico ico--22" viewBox="0 0 24 24" aria-hidden="true" data-i="ayuda"></svg><span class="txt">Glosario y reglas</span></button>
       </div>
