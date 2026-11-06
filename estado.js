@@ -1,2 +1,2 @@
 // Generado por extraer.py — no editar a mano.
-window.ESTADO_ACT = {"intento": "2026-11-05T09:32:20", "resultado": "ok", "mensaje": "131.935 consultas válidas de 131.935 leídas; corte 2026-11-04; 828 en proceso", "archivo": "Detalle_Consulta_SIAC_20261105_041526.xlsx"};
+window.ESTADO_ACT = {"intento": "2026-11-06T10:42:53", "resultado": "error", "mensaje": "No se pudo acceder a http://reportes.mbienes.cl/etl-output/siac/detalle_consulta/detalle_consulta_siac.php tras 3 intentos: <urlopen error [Errno 11001] getaddrinfo failed>. Este enlace solo responde dentro de la red del Ministerio.", "archivo": null};
