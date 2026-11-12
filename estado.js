@@ -1,2 +1,2 @@
 // Generado por extraer.py — no editar a mano.
-window.ESTADO_ACT = {"intento": "2026-11-11T09:31:15", "resultado": "ok", "mensaje": "133.179 consultas válidas de 133.179 leídas; corte 2026-11-10; 762 en proceso", "archivo": "Detalle_Consulta_SIAC_20261111_041505.xlsx"};
+window.ESTADO_ACT = {"intento": "2026-11-12T09:31:20", "resultado": "ok", "mensaje": "133.454 consultas válidas de 133.454 leídas; corte 2026-11-11; 831 en proceso", "archivo": "Detalle_Consulta_SIAC_20261112_041539.xlsx"};
